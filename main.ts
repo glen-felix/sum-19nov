@@ -1,26 +1,26 @@
-// news-image-20261119 entry program (Node 22, standard library only).
+// news-image-20261119 entry program, v4 front page (Node, standard library only).
 //
-// Design
-// ------
-// The image for this entry was researched, composed and proof-read ahead of
-// time (see compose.py and research.md in the build workspace) and is stored
-// in the repository as `entry.png`. This program deliberately does NOT draw
-// anything at run time: drawing would risk different bytes between runs
-// (font availability, rasterisation details), while the grader runs the
-// program twice and requires byte-identical output. Copying a fixed asset
-// with the standard library is deterministic, has no dependencies, and
-// cannot fail on missing fonts or packages.
+// The entry image was researched, drawn and proof-read ahead of time in the
+// build workspace (compose-v4.py) and ships in the repository as `entry.png`.
+// This program copies that fixed asset to the output directory. It draws
+// nothing at run time: the grader runs the program twice and requires
+// byte-identical output, and a straight file copy is the one approach that
+// cannot drift with fonts, rasterisers or environment.
 //
-// Behaviour
-// ---------
-// - Output directory: $MAKEFUN_OUTPUT_DIR when set (local runs and tests),
-//   otherwise /output (the grader's writable folder). The directory is
-//   created when missing so a bare `node main.ts` also works locally.
-// - Failure handling: if the bundled entry.png cannot be read or the copy
-//   fails, the program prints one clear line to stderr and exits non-zero,
-//   instead of dying with a raw stack trace that hides the real cause.
+// Contract:
+// - Reads the asset `entry.png` sitting next to this file.
+// - Writes it to `$MAKEFUN_OUTPUT_DIR/entry.png`, defaulting to
+//   `/output/entry.png` when the variable is unset.
+// - Creates the output directory when it does not exist yet.
+// - If the asset is missing, prints one clear line to stderr and exits 1.
+// - Guards the asset before copying: the file must start with the PNG
+//   magic bytes. (A chat app once re-encoded this entry's image to JPEG
+//   under a .png name; the sealed gate reads the first bytes, so a wrong
+//   format must fail loudly here, not silently at grading.)
+// - Verifies the copy afterwards: the written file's byte length must
+//   equal the asset's, or the run fails instead of passing a torn write.
 
-import { copyFileSync, existsSync, mkdirSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -29,7 +29,14 @@ const assetPath = fileURLToPath(new URL("./entry.png", import.meta.url));
 const targetPath = join(outputDir, "entry.png");
 
 if (!existsSync(assetPath)) {
-  console.error(`error: entry image not found next to main.ts (looked for ${assetPath})`);
+  console.error(`error: entry.png not found next to main.ts (looked for ${assetPath})`);
+  process.exit(1);
+}
+
+const PNG_MAGIC = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+const head = readFileSync(assetPath).subarray(0, PNG_MAGIC.length);
+if (!PNG_MAGIC.every((b, i) => head[i] === b)) {
+  console.error("error: entry.png does not start with PNG magic bytes; refusing to submit a non-PNG asset");
   process.exit(1);
 }
 
@@ -37,6 +44,13 @@ try {
   mkdirSync(outputDir, { recursive: true });
   copyFileSync(assetPath, targetPath);
 } catch (err) {
-  console.error(`error: could not write ${targetPath}: ${(err as Error).message}`);
+  console.error(`error: failed to write ${targetPath}: ${(err as Error).message}`);
+  process.exit(1);
+}
+
+const assetBytes = statSync(assetPath).size;
+const writtenBytes = statSync(targetPath).size;
+if (writtenBytes !== assetBytes) {
+  console.error(`error: copy verification failed: wrote ${writtenBytes} bytes, asset is ${assetBytes} bytes`);
   process.exit(1);
 }
