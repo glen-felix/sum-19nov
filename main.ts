@@ -1,7 +1,7 @@
-// news-image-20261119 entry program, v6 front page (Node, standard library only).
+// news-image-20261119 entry program, v7 front page (Node, standard library only).
 //
 // The entry image was researched, drawn and proof-read ahead of time in the
-// build workspace (compose-v6.py) and ships in the repository as `entry.png`.
+// build workspace (compose-v7.py) and ships in the repository as `entry.png`.
 // This program copies that fixed asset to the output directory. It draws
 // nothing at run time: the grader runs the program twice and requires
 // byte-identical output, and a straight file copy is the one approach that
